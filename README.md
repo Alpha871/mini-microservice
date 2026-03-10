@@ -5,80 +5,75 @@ A microservices-based blog application built with **Node.js**, **React**, and **
 ## Architecture Overview
 
 ```
-+-------------------------------------------------------------------------+
-|                    NGINX Ingress Controller                              |
-|                      Host: posts.com                                    |
-|                                                                         |
-|  /posts/create ------> Posts Service    /posts ------> Query Service    |
-|  /posts/*/comments ---> Comments Svc    /* ----------> Client           |
-+-----------------------------------+------------------------------------+
-                                    |
-                                    v
-+------------------------------------------------------------------------+
-|                        Kubernetes Cluster                               |
-|                                                                        |
-|  +--------------------+                                                |
-|  | Client (React)     |                                                |
-|  | :3000              |                                                |
-|  +---------+----------+                                                |
-|            |                                                           |
-|            v                                                           |
-|  +---------------------------+    +----------------------------+       |
-|  | Posts Service             |    | Comments Service           |       |
-|  | :4000                     |    | :4001                      |       |
-|  | POST /posts/create        |    | POST /posts/:id/comments   |       |
-|  | GET  /posts               |    | GET  /posts/:id/comments   |       |
-|  +------------+--------------+    +--------------+-------------+       |
-|               |                                  |                     |
-|               | PostCreated                      | CommentCreated      |
-|               |                                  | CommentUpdated      |
-|               v                                  v                     |
-|  +-------------------------------------------------------------+      |
-|  |                   Event Bus :4005                            |      |
-|  |                                                             |      |
-|  |  Receives events --> Stores in memory --> Broadcasts to all |      |
-|  |                                                             |      |
-|  |  Events: PostCreated, CommentCreated,                       |      |
-|  |          CommentModerated, CommentUpdated                   |      |
-|  +-------+-----------------+-----------------+-----------------+      |
-|           |                 |                 |                        |
-|           v                 v                 v                        |
-|  +-----------------+ +----------------+ +------------------+          |
-|  | Moderation Svc  | | Query Service  | | Posts & Comments |          |
-|  | :4003           | | :4002          | | (event sync)     |          |
-|  |                 | |                | |                  |          |
-|  | Filters content | | Read model:   | | Receive events   |          |
-|  | Publishes       | | Denormalized  | | to update state  |          |
-|  | CommentModerated| | Posts+Comments | |                  |          |
-|  +-----------------+ +----------------+ +------------------+          |
-|                                                                        |
-+------------------------------------------------------------------------+
+                        +---------------------------+
+                        |   NGINX Ingress Controller |
+                        |     Host: posts.com        |
+                        +-------------+-------------+
+                                      |
+            /posts/create ---> Posts   |   /posts ---------> Query
+            /posts/*/comments -> Comments  /* ------------> Client
+                                      |
+                                      v
+ +----------------------------------------------------------------+
+ |                    Kubernetes Cluster                           |
+ |                                                                |
+ |   +-------------------+                                        |
+ |   | Client (React)    |                                        |
+ |   | :3000             |                                        |
+ |   +--------+----------+                                        |
+ |            |                                                   |
+ |            v                                                   |
+ |   +------------------+          +---------------------+        |
+ |   | Posts Service    |          | Comments Service    |        |
+ |   | :4000            |          | :4001               |        |
+ |   +--------+---------+          +----------+----------+        |
+ |            |                               |                   |
+ |            | PostCreated                   | CommentCreated    |
+ |            |                               | CommentUpdated    |
+ |            v                               v                   |
+ |   +----------------------------------------------------+      |
+ |   |              Event Bus :4005                        |      |
+ |   |                                                     |      |
+ |   |  Events: PostCreated, CommentCreated,               |      |
+ |   |          CommentModerated, CommentUpdated           |      |
+ |   +------+----------------+----------------+------------+      |
+ |          |                |                |                   |
+ |          v                v                v                   |
+ |   +-------------+  +-------------+  +-----------------+       |
+ |   | Moderation  |  | Query       |  | Posts/Comments  |       |
+ |   | :4003       |  | :4002       |  | (event sync)    |       |
+ |   |             |  |             |  |                 |       |
+ |   | Filters and |  | Read model  |  | Receive events  |       |
+ |   | moderates   |  | Posts +     |  | to update their |       |
+ |   | comments    |  | Comments    |  | internal state  |       |
+ |   +-------------+  +-------------+  +-----------------+       |
+ |                                                                |
+ +----------------------------------------------------------------+
 ```
 
 ### Event Flow
 
 ```
-Create Post Flow                     Create Comment Flow
-================                     ===================
+Create Post Flow                  Create Comment Flow
+================                  ===================
 
-Client                               Client
-  |                                    |
-  | POST /posts/create                 | POST /posts/:id/comments
-  v                                    v
-Posts Service                        Comments Service
-  |                                    |
-  | PostCreated                        | CommentCreated
-  v                                    v
-Event Bus --broadcast--> Query       Event Bus --broadcast--> Moderation
-                                       |                        |
-                                       |               CommentModerated
-                                       |                        v
-                                       |<--------------- Event Bus
-                                       |
-                                       | (Updates status)
-                                       | CommentUpdated
-                                       v
-                                     Event Bus --broadcast--> Query
+Client                            Client
+  |                                 |
+  | POST /posts/create              | POST /posts/:id/comments
+  v                                 v
+Posts Service                     Comments Service
+  |                                 |
+  | PostCreated                     | CommentCreated
+  v                                 v
+Event Bus ----> Query             Event Bus ----> Moderation
+                                    |                  |
+                                    |         CommentModerated
+                                    |                  v
+                                    |<----------- Event Bus
+                                    |
+                                    | CommentUpdated
+                                    v
+                                  Event Bus ----> Query
 ```
 
 ## Tech Stack
