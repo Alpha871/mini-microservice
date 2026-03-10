@@ -1,4 +1,4 @@
-# Blog Boilerplate - Microservices Architecture
+# Blog - Microservices Architecture
 
 A microservices-based blog application built with **Node.js**, **React**, and **Kubernetes**. This project demonstrates key distributed systems patterns including **Event-Driven Architecture**, **CQRS**, and **Event Sourcing**.
 
@@ -18,8 +18,8 @@ A microservices-based blog application built with **Node.js**, **React**, and **
 │                          Kubernetes Cluster                                       │
 │                                                                                  │
 │  ┌─────────────────┐                                                             │
-│  │   Client (React) │ :3000                                                      │
-│  │   client-srv     │                                                            │
+│  │  Client (React)  │ :3000                                                      │
+│  │  client-srv      │                                                            │
 │  └────────┬─────────┘                                                            │
 │           │  HTTP Requests                                                       │
 │           ▼                                                                      │
@@ -52,14 +52,14 @@ A microservices-based blog application built with **Node.js**, **React**, and **
 │           ▼                     ▼                       ▼                         │
 │  ┌─────────────────┐  ┌─────────────────┐    ┌──────────────────┐               │
 │  │ Moderation Svc  │  │  Query Service  │    │  Other Services  │               │
-│  │ :4003           │  │  :4002          │    │  (Posts,Comments)│               │
-│  │                 │  │                 │    │                  │               │
-│  │ Filters comments│  │ Read Model:    │    │  Receive events  │               │
-│  │ containing      │  │ Denormalized   │    │  to sync state   │               │
-│  │ "orange"        │  │ Posts+Comments │    │                  │               │
-│  │                 │  │                 │    │                  │               │
-│  │ ──► Publishes   │  │ Replays events │    │                  │               │
-│  │ CommentModerated│  │ on startup     │    │                  │               │
+│  │ :4003           │  │  :4002          │    │  (Posts,Comments) │               │
+│  │                 │  │                 │    │                   │               │
+│  │ Filters comments│  │ Read Model:    │    │  Receive events   │               │
+│  │ containing      │  │ Denormalized   │    │  to sync state    │               │
+│  │ "orange"        │  │ Posts+Comments │    │                   │               │
+│  │                 │  │                 │    │                   │               │
+│  │ ──► Publishes   │  │ Replays events │    │                   │               │
+│  │ CommentModerated│  │ on startup     │    │                   │               │
 │  └─────────────────┘  └─────────────────┘    └──────────────────┘               │
 │                                                                                  │
 └──────────────────────────────────────────────────────────────────────────────────┘
@@ -93,25 +93,25 @@ A microservices-based blog application built with **Node.js**, **React**, and **
 
 ## Tech Stack
 
-| Layer          | Technology                          |
-|----------------|-------------------------------------|
-| Frontend       | React 18, Bootstrap 4, Axios        |
-| Backend        | Node.js, Express                    |
-| Communication  | HTTP/REST, Custom Event Bus         |
-| Orchestration  | Kubernetes, Skaffold                |
-| Containerization | Docker (Alpine Node images)       |
-| Ingress        | NGINX Ingress Controller            |
+| Layer            | Technology                   |
+| ---------------- | ---------------------------- |
+| Frontend         | React 18, Bootstrap 4, Axios |
+| Backend          | Node.js, Express             |
+| Communication    | HTTP/REST, Custom Event Bus  |
+| Orchestration    | Kubernetes, Skaffold         |
+| Containerization | Docker (Alpine Node images)  |
+| Ingress          | NGINX Ingress Controller     |
 
 ## Services
 
-| Service      | Port | Description                                          |
-|-------------|------|------------------------------------------------------|
-| **Client**      | 3000 | React SPA — create posts, view posts & comments     |
-| **Posts**       | 4000 | Creates and stores blog posts                        |
-| **Comments**    | 4001 | Creates comments, handles status updates             |
-| **Query**       | 4002 | Read model — denormalized view of posts + comments   |
-| **Moderation**  | 4003 | Validates comment content (rejects word "orange")    |
-| **Event Bus**   | 4005 | Central event dispatcher and event store             |
+| Service        | Port | Description                                        |
+| -------------- | ---- | -------------------------------------------------- |
+| **Client**     | 3000 | React SPA — create posts, view posts & comments    |
+| **Posts**      | 4000 | Creates and stores blog posts                      |
+| **Comments**   | 4001 | Creates comments, handles status updates           |
+| **Query**      | 4002 | Read model — denormalized view of posts + comments |
+| **Moderation** | 4003 | Validates comment content (rejects word "orange")  |
+| **Event Bus**  | 4005 | Central event dispatcher and event store           |
 
 ## Project Structure
 
@@ -172,17 +172,20 @@ blog-boilerplate/
 1. **Enable Kubernetes** in Docker Desktop or start Minikube.
 
 2. **Install NGINX Ingress Controller:**
+
    ```bash
    kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
    ```
 
 3. **Add host entry** (for local development):
+
    ```bash
    # Add to /etc/hosts
    127.0.0.1 posts.com
    ```
 
 4. **Start the application:**
+
    ```bash
    skaffold dev
    ```
