@@ -4,76 +4,91 @@ A microservices-based blog application built with **Node.js**, **React**, and **
 
 ## Architecture Overview
 
-```
-                        +---------------------------+
-                        |   NGINX Ingress Controller |
-                        |     Host: posts.com        |
-                        +-------------+-------------+
-                                      |
-            /posts/create ---> Posts   |   /posts ---------> Query
-            /posts/*/comments -> Comments  /* ------------> Client
-                                      |
-                                      v
- +----------------------------------------------------------------+
- |                    Kubernetes Cluster                           |
- |                                                                |
- |   +-------------------+                                        |
- |   | Client (React)    |                                        |
- |   | :3000             |                                        |
- |   +--------+----------+                                        |
- |            |                                                   |
- |            v                                                   |
- |   +------------------+          +---------------------+        |
- |   | Posts Service    |          | Comments Service    |        |
- |   | :4000            |          | :4001               |        |
- |   +--------+---------+          +----------+----------+        |
- |            |                               |                   |
- |            | PostCreated                   | CommentCreated    |
- |            |                               | CommentUpdated    |
- |            v                               v                   |
- |   +----------------------------------------------------+      |
- |   |              Event Bus :4005                        |      |
- |   |                                                     |      |
- |   |  Events: PostCreated, CommentCreated,               |      |
- |   |          CommentModerated, CommentUpdated           |      |
- |   +------+----------------+----------------+------------+      |
- |          |                |                |                   |
- |          v                v                v                   |
- |   +-------------+  +-------------+  +-----------------+       |
- |   | Moderation  |  | Query       |  | Posts/Comments  |       |
- |   | :4003       |  | :4002       |  | (event sync)    |       |
- |   |             |  |             |  |                 |       |
- |   | Filters and |  | Read model  |  | Receive events  |       |
- |   | moderates   |  | Posts +     |  | to update their |       |
- |   | comments    |  | Comments    |  | internal state  |       |
- |   +-------------+  +-------------+  +-----------------+       |
- |                                                                |
- +----------------------------------------------------------------+
+```mermaid
+graph TB
+    subgraph Ingress["NGINX Ingress Controller - posts.com"]
+        direction LR
+        R1["/posts/create --> Posts"]
+        R2["/posts --> Query"]
+        R3["/posts/*/comments --> Comments"]
+        R4["/* --> Client"]
+    end
+
+    subgraph K8s["Kubernetes Cluster"]
+        Client["Client - React :3000"]
+
+        subgraph Write["API Layer - Write"]
+            Posts["Posts Service :4000"]
+            Comments["Comments Service :4001"]
+        end
+
+        EventBus["Event Bus :4005"]
+
+        subgraph Read["API Layer - Read"]
+            Query["Query Service :4002"]
+        end
+
+        Moderation["Moderation Service :4003"]
+    end
+
+    Ingress --> Client
+    Ingress --> Posts
+    Ingress --> Comments
+    Ingress --> Query
+
+    Client -->|"POST /posts/create"| Posts
+    Client -->|"POST /posts/:id/comments"| Comments
+    Client -->|"GET /posts"| Query
+
+    Posts -->|"PostCreated"| EventBus
+    Comments -->|"CommentCreated / CommentUpdated"| EventBus
+
+    EventBus -->|"broadcast"| Query
+    EventBus -->|"CommentCreated"| Moderation
+    EventBus -->|"CommentModerated"| Comments
+
+    Moderation -->|"CommentModerated"| EventBus
 ```
 
-### Event Flow
+### Event Flows
 
+#### Create Post
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant P as Posts Service
+    participant EB as Event Bus
+    participant Q as Query Service
+
+    C->>P: POST /posts/create {title}
+    P->>P: Store post in memory
+    P->>EB: PostCreated
+    EB->>Q: PostCreated
+    Q->>Q: Update read model
 ```
-Create Post Flow                  Create Comment Flow
-================                  ===================
 
-Client                            Client
-  |                                 |
-  | POST /posts/create              | POST /posts/:id/comments
-  v                                 v
-Posts Service                     Comments Service
-  |                                 |
-  | PostCreated                     | CommentCreated
-  v                                 v
-Event Bus ----> Query             Event Bus ----> Moderation
-                                    |                  |
-                                    |         CommentModerated
-                                    |                  v
-                                    |<----------- Event Bus
-                                    |
-                                    | CommentUpdated
-                                    v
-                                  Event Bus ----> Query
+#### Create Comment
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant Co as Comments Service
+    participant EB as Event Bus
+    participant M as Moderation Service
+    participant Q as Query Service
+
+    C->>Co: POST /posts/:id/comments {content}
+    Co->>Co: Store comment (status: pending)
+    Co->>EB: CommentCreated
+    EB->>M: CommentCreated
+    M->>M: Check content rules
+    M->>EB: CommentModerated (approved/rejected)
+    EB->>Co: CommentModerated
+    Co->>Co: Update comment status
+    Co->>EB: CommentUpdated
+    EB->>Q: CommentUpdated
+    Q->>Q: Update read model
 ```
 
 ## Tech Stack
