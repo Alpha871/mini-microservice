@@ -4,50 +4,26 @@ A microservices-based blog application built with **Node.js**, **React**, and **
 
 ## Architecture Overview
 
-```mermaid
-graph TB
-    subgraph Ingress["NGINX Ingress Controller - posts.com"]
-        direction LR
-        R1["/posts/create --> Posts"]
-        R2["/posts --> Query"]
-        R3["/posts/*/comments --> Comments"]
-        R4["/* --> Client"]
-    end
-
-    subgraph K8s["Kubernetes Cluster"]
-        Client["Client - React :3000"]
-
-        subgraph Write["API Layer - Write"]
-            Posts["Posts Service :4000"]
-            Comments["Comments Service :4001"]
-        end
-
-        EventBus["Event Bus :4005"]
-
-        subgraph Read["API Layer - Read"]
-            Query["Query Service :4002"]
-        end
-
-        Moderation["Moderation Service :4003"]
-    end
-
-    Ingress --> Client
-    Ingress --> Posts
-    Ingress --> Comments
-    Ingress --> Query
-
-    Client -->|"POST /posts/create"| Posts
-    Client -->|"POST /posts/:id/comments"| Comments
-    Client -->|"GET /posts"| Query
-
-    Posts -->|"PostCreated"| EventBus
-    Comments -->|"CommentCreated / CommentUpdated"| EventBus
-
-    EventBus -->|"broadcast"| Query
-    EventBus -->|"CommentCreated"| Moderation
-    EventBus -->|"CommentModerated"| Comments
-
-    Moderation -->|"CommentModerated"| EventBus
+```
+                 +-------------------------------+
+                 |  NGINX Ingress  (posts.com)   |
+                 +-------------------------------+
+                    |         |         |         |
+                    v         v         v         v
+               +---------+---------+---------+---------+
+               | Client  |  Posts  |Comments |  Query  |
+               |  :3000  |  :4000  |  :4001  |  :4002  |
+               +---------+----+----+----+----+----+----+
+                              |         |         ^
+                              v         v         |
+                         +------------------------+
+                         |    Event Bus  :4005    |
+                         +-----------+------------+
+                                     |
+                                     v
+                         +------------------------+
+                         |   Moderation   :4003   |
+                         +------------------------+
 ```
 
 ### Event Flows
