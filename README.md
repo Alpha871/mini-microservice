@@ -5,25 +5,50 @@ A microservices-based blog application built with **Node.js**, **React**, and **
 ## Architecture Overview
 
 ```
-                 +-------------------------------+
-                 |  NGINX Ingress  (posts.com)   |
-                 +-------------------------------+
-                    |         |         |         |
-                    v         v         v         v
-               +---------+---------+---------+---------+
-               | Client  |  Posts  |Comments |  Query  |
-               |  :3000  |  :4000  |  :4001  |  :4002  |
-               +---------+----+----+----+----+----+----+
-                              |         |         ^
-                              v         v         |
-                         +------------------------+
-                         |    Event Bus  :4005    |
-                         +-----------+------------+
-                                     |
-                                     v
-                         +------------------------+
-                         |   Moderation   :4003   |
-                         +------------------------+
+                        +-------------------------------+
+                        | NGINX Ingress Controller      |
+                        |   Host: posts.com             |
+                        +-------------------------------+
+                                        |
+           /posts/create ---> Posts     |   /posts ---------> Query
+           /posts/*/comments -> Comments    /* ------------> Client
+                                        |
+                                        v
+ +-----------------------------------------------------------------+
+ |  Kubernetes Cluster                                             |
+ |                                                                 |
+ |  +-------------------+                                          |
+ |  | Client (React)    |                                          |
+ |  | :3000             |                                          |
+ |  +--------+----------+                                          |
+ |           |                                                     |
+ |           v                                                     |
+ |  +------------------+          +---------------------+          |
+ |  | Posts Service    |          | Comments Service    |          |
+ |  | :4000            |          | :4001               |          |
+ |  +--------+---------+          +----------+----------+          |
+ |           |                               |                     |
+ |           | PostCreated                   | CommentCreated      |
+ |           |                               | CommentUpdated      |
+ |           v                               v                     |
+ |  +----------------------------------------------------+        |
+ |  |              Event Bus :4005                        |        |
+ |  |                                                     |        |
+ |  |  Events: PostCreated, CommentCreated,               |        |
+ |  |          CommentModerated, CommentUpdated           |        |
+ |  +------+----------------+----------------+------------+        |
+ |         |                |                |                     |
+ |         v                v                v                     |
+ |  +-------------+  +-------------+  +-----------------+          |
+ |  | Moderation  |  | Query       |  | Posts/Comments  |          |
+ |  | :4003       |  | :4002       |  | (event sync)    |          |
+ |  |             |  |             |  |                 |          |
+ |  | Filters and |  | Read model  |  | Receive events  |          |
+ |  | moderates   |  | Posts +     |  | to update their |          |
+ |  | comments    |  | Comments    |  | internal state  |          |
+ |  +-------------+  +-------------+  +-----------------+          |
+ |                                                                 |
+ +-----------------------------------------------------------------+
 ```
 
 ### Event Flows
